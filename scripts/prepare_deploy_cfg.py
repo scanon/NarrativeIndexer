@@ -11,6 +11,7 @@ if __name__ == "__main__":
         print("Properties from <file_with_properties> will be applied to <deploy_cfg_template_file>")
         print("template which will be overwritten with .orig copy saved in the same folder first.")
         sys.exit(1)
+    addcfg = '/kb/module/work/additional.cfg'
     file = open(sys.argv[1], 'r')
     text = file.read()
     t = Template(text)
@@ -38,7 +39,13 @@ if __name__ == "__main__":
         config.readfp(StringIO.StringIO(props))
     else:
         raise ValueError('Neither ' + sys.argv[2] + ' file nor KBASE_ENDPOINT env-variable found')
+
     props = dict(config.items("global"))
+    if os.path.exists(addcfg):
+       config2 = ConfigParser()
+       config2.read(addcfg)
+       props2 = dict(config2.items("global"))
+       props.update(props2)
     output = t.render(props)
     with open(sys.argv[1] + ".orig", 'w') as f:
         f.write(text)

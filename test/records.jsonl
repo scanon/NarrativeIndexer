@@ -1,0 +1,6 @@
+{ "strcde" : "WS", "accgrp" : 10459, "objid" : "1", "ver" : 227, "newname" : null, "time" : "2018-02-08T23:23:25.553Z", "evtype" : "NEW_VERSION", "objtype" : "KBaseNarrative.Narrative", "objtypever" : 4, "public" : false}
+{ "strcde" : "WS", "accgrp" : 10459, "objid" : "1", "ver" : 228, "newname" : null, "time" : "2018-02-08T23:27:02.768Z", "evtype" : "NEW_VERSION", "objtype" : "KBaseNarrative.Narrative", "objtypever" : 4, "public" : false}
+{ "strcde" : "WS", "accgrp" : 28269, "objid" : "7", "ver" : 1, "newname" : null, "time" : "2018-02-08T23:50:30.339Z", "evtype" : "NEW_VERSION", "objtype" : "KBaseGenomes.Genome", "objtypever" : 8, "public" : false}
+{ "strcde" : "WS", "accgrp" : 10459, "objid" : "31", "ver" : null, "newname" : null, "time" : "2018-02-08T23:55:03.287Z", "evtype" : "NEW_ALL_VERSIONS", "objtype" : null, "objtypever" : null, "public" : false}
+{ "strcde" : "WS", "accgrp" : 10459, "objid" : "31", "ver" : null, "newname" : "Escherichia_coli_str_K-12_substr_MG1655_NCBI-deleted-1518134311489", "time" : "2018-02-08T23:58:31.500Z", "evtype" : "RENAME_ALL_VERSIONS", "objtype" : null, "objtypever" : null, "public" : null}
+{ "strcde" : "WS", "accgrp" : 10459, "objid" : "31", "ver" : null, "newname" : null, "time" : "2018-02-08T23:58:31.581Z", "evtype" : "DELETE_ALL_VERSIONS", "objtype" : null, "objtypever" : null, "public" : null}

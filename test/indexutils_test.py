@@ -63,11 +63,11 @@ class WSAdminTester(unittest.TestCase):
     def index_workspace_test(self):
         iu = IndexerUtils(self.cfg)
         res = iu.index_workspace(self.wsid)
-        print(res)
+        #print(res)
         self.assertIsNotNone(res)
 
     def index_object_test(self):
         iu = IndexerUtils(self.cfg)
         res = iu.index_object(self.upa)
-        print(res)
+        #print(res)
         self.assertIsNotNone(res)

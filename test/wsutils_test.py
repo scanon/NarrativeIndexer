@@ -62,7 +62,6 @@ class WSAdminTester(unittest.TestCase):
     def list_test(self):
         ws = WorkspaceAdminUtil(self.cfg)
         res = ws.list_objects({'ids': [self.wsid]})[0]
-        print(res)
         self.assertIsNotNone(res)
 
     def get_objects_test(self):
