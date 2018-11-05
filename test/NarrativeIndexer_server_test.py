@@ -55,12 +55,12 @@ class NarrativeIndexerTest(unittest.TestCase):
         #                     }],
         #                'authenticated': 1})
         cls.wsURL = cls.cfg['workspace-url']
-        cls.wsClient = workspaceService(cls.wsURL)
+        cls.wsClient = Workspace(cls.wsURL)
         # Kafka
-        cls.kserver = cls.cfg.get('kafka_server', 'kafka')
+        cls.kserver = cls.cfg.get('kafka-server', 'kafka')
         cls.admin = AdminClient({'bootstrap.servers': cls.kserver})
         cls.topic = 'testevents-%d' % (randint(1,10000))
-        cls.cfg['kafka_topic'] = cls.topic
+        cls.cfg['kafka-topic'] = cls.topic
         cls.admin.delete_topics([cls.topic])
         new_topics = [NewTopic(cls.topic, num_partitions=1, replication_factor=1)]
         cls.admin.create_topics(new_topics)
@@ -105,9 +105,10 @@ class NarrativeIndexerTest(unittest.TestCase):
         with open(file) as f:
             for event in f.read().split('\n'):
                 self.producer.poll(0)
+                if event=='':
+                    continue
                 self.producer.produce(self.topic, event.encode('utf-8'))
-        print(self.producer.flush())
-        print("Pushed")
+        self.producer.flush()
 
 
     def check_events(self):

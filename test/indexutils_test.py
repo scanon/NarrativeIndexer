@@ -17,7 +17,7 @@ from NarrativeIndexer.authclient import KBaseAuth as _KBaseAuth
 from Utils.IndexerUtils import IndexerUtils
 
 
-class WSAdminTester(unittest.TestCase):
+class IndexerTester(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -71,3 +71,8 @@ class WSAdminTester(unittest.TestCase):
         res = iu.index_object(self.upa)
         #print(res)
         self.assertIsNotNone(res)
+
+    def index_request_test(self):
+        iu = IndexerUtils(self.cfg)
+        res = iu.index_request(self.upa)
+        #print(res)

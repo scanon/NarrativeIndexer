@@ -28,10 +28,9 @@ class NarrativeIndexer:
 
     #BEGIN_CLASS_HEADER
     def kafka_watcher(self):
-        print('kafka watcher: '+str(self.config))
-        topic = self.config.get('kafka_topic','wsevents')
-        server = self.config.get('kafka_server','kafka')
-        cgroup = self.config.get('kafka_clientgroup','narrative_indexer')
+        topic = self.config.get('kafka-topic','wsevents')
+        server = self.config.get('kafka-server','kafka')
+        cgroup = self.config.get('kafka-clientgroup','narrative_indexer')
 
 
         c = Consumer({
@@ -54,10 +53,8 @@ class NarrativeIndexer:
                     print("Kafka error: "+msg.error())
                     continue
 
-            print('Received message: {}'.format(msg.value().decode('utf-8')))
             try:
                 data = json.loads(msg.value().decode('utf-8'))
-                print(data)
                 self.process_event(data)
             except BaseException as e:
                 print(str(e))
@@ -74,6 +71,12 @@ class NarrativeIndexer:
             upa = '%s/%s/%s' % (event['accgrp'], event['objid'], event['ver'])
             res = self.iu.index_object(upa)
             print(res)
+        elif event['evtype'] == 'NEW_ALL_VERSIONS':
+            return
+        elif event['evtype'] == 'RENAME_ALL_VERSIONS':
+            return
+        elif event['evtype'] == 'DELETE_ALL_VERSIONS':
+            return
         else:
             print("Can't process evtype " + event['evtype']) 
 

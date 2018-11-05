@@ -2,6 +2,8 @@ from Utils.WSAdminUtils import WorkspaceAdminUtil
 from Indexers.ObjectIndexer import ObjectIndexer
 from Indexers.NarrativeObjectIndexer import NarrativeObjectIndexer
 from Indexers.GenomeObjectIndexer import GenomeObjectIndexer
+from elasticsearch import Elasticsearch
+
 from time import time
 
 # This is the interface that will handle the event
@@ -10,6 +12,7 @@ from time import time
 
 NARRATIVE_TYPES = ['KBaseNarrative.Narrative']
 GENOME_TYPES = ['KBaseGenomes.Genome']
+SPECIAL_TYPES = ['KBaseGenomes.Genome']
 
 
 class IndexerUtils:
@@ -21,6 +24,9 @@ class IndexerUtils:
         self.goi = GenomeObjectIndexer(self.ws)
         self.fakeid = 99999
         self.fakever = 1
+        (host,port) = config['elastic-host'].split(':')
+        self.es = Elasticsearch([config['elastic-host']])
+        self.esindex = config['elastic-index']
 
     def create_mappings(self):
         # TODO: Initialize ES Mappings
@@ -78,10 +84,29 @@ class IndexerUtils:
             otype = obj[2].split('-')[0]
             if otype in NARRATIVE_TYPES:
                 continue
-            oindex = self.index_object(upa, otype=otype)
+            if otype in SPECIAL_TYPES:
+                oindex = self.index_object(upa, otype=otype)
+                oindex.update(self._create_obj_rec(obj))
+            else:
+                oindex = self._create_obj_rec(obj)
             rec['objects'].append(oindex)
         return rec
 
+    def _create_obj_rec(self, obj):
+        doc = {
+            "name": obj[1],
+            "upa": self._get_upa(obj),
+            "version": obj[4],
+            "type": obj[2],
+            "date": obj[3],
+            "created_by": obj[5],
+            "md5": obj[8]
+        }
+        return doc
+    
+    def _get_upa(self, obj):
+        return '%s/%s/%s' % (obj[6], obj[0], obj[4])
+         
     def _access_rec(self, wsid):
         rec = {
             "extpub": [],
@@ -100,6 +125,19 @@ class IndexerUtils:
         # type": "access"
         return rec
 
+    def _get_id(self, rid):
+        return "WS:%d" % (int(rid.split('/')[0]))
+
+    def _get_es_record(self, eid):
+        print(self.esindex)
+        try:
+  	    res = self.es.get(index=self.esindex, doc_type='data', id=eid)
+	    print(res['_source'])
+        except:
+            return None
+        return res['_source']
+           
+
     def index_object(self, upa, otype=None):
         if otype in NARRATIVE_TYPES:
             return self.noi.index(upa)
@@ -108,5 +146,14 @@ class IndexerUtils:
         else:
             return self.oi.index(upa)
 
-    def index_request(self, request):
-        pass
+    def index_request(self, upa):
+        eid = self._get_id(upa)
+        doc = self._get_es_record(eid)
+        if doc is None:
+            wsid = int(upa.split('/')[0])
+            doc = self.index_workspace(wsid)
+        else:
+            # Do an update with the upa as a hint
+            pass
+	res = self.es.index(index=self.esindex, doc_type='data', id=eid, body=doc)
+        print(res['result'])
