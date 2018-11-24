@@ -1,7 +1,6 @@
 from Utils.WSAdminUtils import WorkspaceAdminUtil
-from Indexers.ObjectIndexer import ObjectIndexer
-from Indexers.NarrativeObjectIndexer import NarrativeObjectIndexer
-from Indexers.GenomeObjectIndexer import GenomeObjectIndexer
+from Indexers.NarrativeObjectIndexer import narrative_indexer
+from Indexers.GenomeObjectIndexer import genome_indexer
 from elasticsearch import Elasticsearch
 
 from time import time
@@ -19,12 +18,8 @@ class IndexerUtils:
 
     def __init__(self, config):
         self.ws = WorkspaceAdminUtil(config)
-        self.oi = ObjectIndexer(self.ws)
-        self.noi = NarrativeObjectIndexer(self.ws)
-        self.goi = GenomeObjectIndexer(self.ws)
         self.fakeid = 99999
         self.fakever = 1
-        (host,port) = config['elastic-host'].split(':')
         self.es = Elasticsearch([config['elastic-host']])
         self.esindex = config['elastic-index']
 
@@ -39,21 +34,12 @@ class IndexerUtils:
         Need to change to bulk calls
         """
         # List ws
-        info = self.ws.get_workspace_info({'id': wsid})
-        # [16962, u'scanon:narrative_1485560571814', u'scanon',
-        # u'2018-10-18T00:12:42+0000', 25, u'a', u'n',
-        # u'unlocked',
-        # {u'is_temporary': u'false', u'narrative': u'23',
-        #  u'narrative_nice_name': u'RNASeq Analysis - Jose',
-        # u'data_palette_id': u'22'}]
-        meta = info[8]
+        wsinfo = self._get_ws_info(wsid)
+        meta = wsinfo['meta']
+        info = wsinfo['info']
         # Don't index temporary narratives
-        if 'is_temporary' in meta and not meta['is_temporary']:
+        if wsinfo['temp']:
             return None
-
-        public = False
-        if info[6] != 'n':
-            public = True
         # TODO
         shared = False
 
@@ -65,11 +51,11 @@ class IndexerUtils:
             "guid": "WS:%s/%s/%s" % (wsid, self.fakeid, self.fakever),
             "islast": True,
             "prefix": "WS:%s/%s" % (wsid, self.fakeid),
-            "public": public,
+            "public": wsinfo['public'],
             "shared": shared,
             "stags": [],
             "str_cde": "WS",
-            "timestamp": time(),
+            "timestamp": int(time()),
             "version": 1
         }
 
@@ -78,7 +64,7 @@ class IndexerUtils:
             upa = '%d/%s' % (wsid, meta['narrative'])
             rec['narrative'] = self.index_object(upa, 'KBaseNarrative.Narrative')
         # { u'narrative': u'23', , u'data_palette_id': u'22'}
-        rec['objects'] = []
+        rec['objects'] = dict()
         for obj in self.ws.list_objects({'ids': [wsid]}):
             upa = '%s/%s/%s' % (obj[6], obj[0], obj[4])
             otype = obj[2].split('-')[0]
@@ -89,7 +75,7 @@ class IndexerUtils:
                 oindex.update(self._create_obj_rec(obj))
             else:
                 oindex = self._create_obj_rec(obj)
-            rec['objects'].append(oindex)
+            rec['objects'][obj[0]] = oindex
         return rec
 
     def _create_obj_rec(self, obj):
@@ -103,11 +89,11 @@ class IndexerUtils:
             "md5": obj[8]
         }
         return doc
-    
+
     def _get_upa(self, obj):
         return '%s/%s/%s' % (obj[6], obj[0], obj[4])
-         
-    def _access_rec(self, wsid):
+
+    def _access_rec(self, wsid, public=False):
         rec = {
             "extpub": [],
             "groups": [
@@ -119,41 +105,120 @@ class IndexerUtils:
                 wsid
             ],
             "pguid": "WS:%s/%s/%s" % (wsid, self.fakeid, self.fakever),
-            "prefix": "WS:%s/%s%s" % (wsid, self.fakeid),
+            "prefix": "WS:%s/%s" % (wsid, self.fakeid),
             "version": self.fakever
         }
+        if public:
+            rec['lastin'].append(-1)
+            rec['groups'].append(-1)
         # type": "access"
         return rec
 
-    def _get_id(self, rid):
-        return "WS:%d" % (int(rid.split('/')[0]))
+    def _get_wsid(self, upa):
+        """
+        Return the workspace id as an int from an UPA
+        """
+        return int(str(upa).split('/')[0])
 
-    def _get_es_record(self, eid):
-        print(self.esindex)
+    def _get_id(self, rid):
+        """
+        Return the elastic id
+        """
+        if str(rid).find('/') > 0:
+            return "WS:%d" % (int(str(rid).split('/')[0]))
+        else:
+            return "WS:%d" % (int(rid))
+
+    def _get_es_data_record(self, wsid):
+        eid = self._get_id(wsid)
         try:
-  	    res = self.es.get(index=self.esindex, doc_type='data', id=eid)
-	    print(res['_source'])
+            res = self.es.get(index=self.esindex, routing=eid, doc_type='data', id=eid)
         except:
             return None
-        return res['_source']
-           
+        return res
+
+    def _put_es_data_record(self, wsid, doc, version=None, reindex=False):
+        eid = self._get_id(wsid)
+        if reindex:
+            res = self.es.index(index=self.esindex, parent=eid, doc_type='data',
+                                id=eid, routing=eid, body=doc)
+        elif version is None:
+            res = self.es.create(index=self.esindex, parent=eid, doc_type='data',
+                                 id=eid, routing=eid, body=doc)
+        else:
+            res = self.es.index(index=self.esindex, parent=eid, doc_type='data',
+                                id=eid, routing=eid, version=version, body=doc)
+        return res
+
+    def _get_ws_info(self, upa):
+        wsid = int(str(upa).split('/')[0])
+        info = self.ws.get_workspace_info({'id': wsid})
+        meta = info[8]
+        # Don't index temporary narratives
+        temp = False
+        if meta.get('is_temporary') == 'true':
+            temp = True
+
+        public = False
+        if info[6] != 'n':
+            public = True
+
+        return {'wsid': wsid, 'info': info, 'meta': meta,
+                'temp': temp, 'public': public}
+
+    def update_access(self, upa):
+        # Should pass a wsid but just in case...
+        info = self._get_ws_info(upa)
+        wsid = info['wsid']
+        if info['temp']:
+            return None
+        doc = self._access_rec(wsid, public=info['public'])
+        eid = self._get_id(str(wsid))
+        res = self.es.index(index=self.esindex, doc_type='access', id=eid, body=doc)
+        return res
 
     def index_object(self, upa, otype=None):
         if otype in NARRATIVE_TYPES:
-            return self.noi.index(upa)
+            return narrative_indexer(self.ws, upa)
         elif otype in GENOME_TYPES:
-            return self.goi.index(upa)
+            return genome_indexer(self.ws, upa)
         else:
-            return self.oi.index(upa)
+            return {}
 
     def index_request(self, upa):
-        eid = self._get_id(upa)
-        doc = self._get_es_record(eid)
-        if doc is None:
-            wsid = int(upa.split('/')[0])
+        wsid = self._get_wsid(upa)
+        rec = self._get_es_data_record(wsid)
+        # TODO check if WS is deleted
+        if rec is None:
             doc = self.index_workspace(wsid)
+            self.update_access(upa)
+            res = self._put_es_data_record(wsid, doc)
         else:
+            doc = rec['_source']
+            vers = rec['_version']
+            upaf = map(lambda x: int(x), upa.split('/'))
+            wsid = list(upaf)[0]
+            doc = self.index_workspace(wsid)
+            self.update_access(upa)
             # Do an update with the upa as a hint
+            res = self._put_es_data_record(wsid, doc, version=vers)
+        return res['result']
+
+    def reindex_request(self, wsid):
+        # TODO check if WS is deleted
+        doc = self.index_workspace(wsid)
+        self.update_access(wsid)
+        res = self._put_es_data_record(wsid, doc, reindex=True)
+        return res['result']
+
+    def delete_object(self, upa):
+        wsid = self._get_wsid(upa)
+        rec = self._get_es_data_record(wsid)
+        if rec is None:
+            # create
             pass
-	res = self.es.index(index=self.esindex, doc_type='data', id=eid, body=doc)
-        print(res['result'])
+        else:
+            # doc = rec['_source']
+            # vers = rec['_version']
+            # delete from docs
+            pass

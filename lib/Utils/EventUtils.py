@@ -3,6 +3,7 @@
 # This waits for events and dispatches it to the indexer
 #
 
+
 class EventUtils:
 
     def __init__(self, config):

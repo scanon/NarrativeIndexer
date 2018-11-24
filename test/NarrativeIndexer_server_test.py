@@ -3,7 +3,6 @@ import unittest
 import os  # noqa: F401
 import json  # noqa: F401
 import time
-import requests
 from random import randint
 
 from os import environ
@@ -16,21 +15,18 @@ from pprint import pprint  # noqa: F401
 
 from Workspace.WorkspaceClient import Workspace
 from NarrativeIndexer.NarrativeIndexerImpl import NarrativeIndexer
-#from NarrativeIndexer.NarrativeIndexerServer import MethodContext
-from NarrativeIndexer.authclient import KBaseAuth as _KBaseAuth
+# from NarrativeIndexer.NarrativeIndexerServer import MethodContext
+# from NarrativeIndexer.authclient import KBaseAuth as _KBaseAuth
 from confluent_kafka import Producer
 from confluent_kafka.admin import AdminClient, NewTopic
-from confluent_kafka import Consumer, KafkaError
-
-
-
-
+from confluent_kafka import Consumer
 
 
 class NarrativeIndexerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.test_dir = os.path.dirname(os.path.abspath(__file__))
         cls.token = environ.get('KB_AUTH_TOKEN', None)
         config_file = environ.get('KB_DEPLOYMENT_CONFIG', None)
         cls.cfg = {}
@@ -40,13 +36,11 @@ class NarrativeIndexerTest(unittest.TestCase):
         for nameval in config.items('NarrativeIndexer'):
             cls.cfg[nameval[0]] = nameval[1]
         # Getting username from Auth profile for token
-        authServiceUrl = cls.cfg['auth-service-url']
-        auth_client = _KBaseAuth(authServiceUrl)
-        user_id = auth_client.get_user(cls.token)
+        # authServiceUrl = cls.cfg['auth-service-url']
         # WARNING: don't call any logging methods on the context object,
         # it'll result in a NoneType error
-        #cls.ctx = MethodContext(None)
-        #cls.ctx.update({'token': cls.token,
+        # cls.ctx = MethodContext(None)
+        # cls.ctx.update({'token': cls.token,
         #                'user_id': user_id,
         #                'provenance': [
         #                    {'service': 'NarrativeIndexer',
@@ -59,7 +53,8 @@ class NarrativeIndexerTest(unittest.TestCase):
         # Kafka
         cls.kserver = cls.cfg.get('kafka-server', 'kafka')
         cls.admin = AdminClient({'bootstrap.servers': cls.kserver})
-        cls.topic = 'testevents-%d' % (randint(1,10000))
+        # create a random topic
+        cls.topic = 'testevents-%d' % (randint(1, 10000))
         cls.cfg['kafka-topic'] = cls.topic
         cls.admin.delete_topics([cls.topic])
         new_topics = [NewTopic(cls.topic, num_partitions=1, replication_factor=1)]
@@ -96,28 +91,21 @@ class NarrativeIndexerTest(unittest.TestCase):
     def getContext(self):
         return self.__class__.ctx
 
-
     def push_events(self, file):
-
-        #for event in events:
-        #    js = json.dumps(event)
-        #    p.produce(self.topic, js.encode('utf-8'))
         with open(file) as f:
             for event in f.read().split('\n'):
                 self.producer.poll(0)
-                if event=='':
+                if event == '':
                     continue
                 self.producer.produce(self.topic, event.encode('utf-8'))
         self.producer.flush()
 
-
     def check_events(self):
         c = Consumer({
-             'bootstrap.servers': self.kserver,
-             'group.id': 'mytestgroup',
-             'auto.offset.reset': 'earliest'
-           })
-
+                     'bootstrap.servers': self.kserver,
+                     'group.id': 'mytestgroup',
+                     'auto.offset.reset': 'earliest'
+                     })
         c.subscribe([self.topic])
         while True:
             msg = c.poll(1.0)
@@ -125,22 +113,10 @@ class NarrativeIndexerTest(unittest.TestCase):
             if msg is None:
                 continue
             else:
-               break
+                break
         c.close()
 
-
-
-    # NOTE: According to Python unittest naming rules test method names should start from 'test'. # noqa
-    def test_your_method(self):
-        # Prepare test objects in workspace if needed using
-        # self.getWsClient().save_objects({'workspace': self.getWsName(),
-        #                                  'objects': []})
-        #
-        # Run your method by
-        # ret = self.getImpl().your_method(self.getContext(), parameters...)
-        #
-        # Check returned data with
-        # self.assertEqual(ret[...], ...) or other unittest methods
-        self.push_events('records.jsonl')
+    def test_pushing_events(self):
+        self.push_events(os.path.join(self.test_dir, 'records.jsonl'))
         self.check_events()
         time.sleep(7)

@@ -14,7 +14,7 @@ except:
 from pprint import pprint  # noqa: F401
 
 from Workspace.WorkspaceClient import Workspace as workspaceService
-from NarrativeIndexer.authclient import KBaseAuth as _KBaseAuth
+# from NarrativeIndexer.authclient import KBaseAuth as _KBaseAuth
 
 
 class WSAdminTester(unittest.TestCase):
@@ -29,9 +29,9 @@ class WSAdminTester(unittest.TestCase):
         for nameval in config.items('NarrativeIndexer'):
             cls.cfg[nameval[0]] = nameval[1]
         # Getting username from Auth profile for token
-        authServiceUrl = cls.cfg['auth-service-url']
-        auth_client = _KBaseAuth(authServiceUrl)
-        user_id = auth_client.get_user(cls.token)
+        # authServiceUrl = cls.cfg['auth-service-url']
+        # auth_client = _KBaseAuth(authServiceUrl)
+        # user_id = auth_client.get_user(cls.token)
         # WARNING: don't call any logging methods on the context object,
         # it'll result in a NoneType error
         cls.wsURL = cls.cfg['workspace-url']

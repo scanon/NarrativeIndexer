@@ -28,10 +28,9 @@ class NarrativeIndexer:
 
     #BEGIN_CLASS_HEADER
     def kafka_watcher(self):
-        topic = self.config.get('kafka-topic','wsevents')
-        server = self.config.get('kafka-server','kafka')
-        cgroup = self.config.get('kafka-clientgroup','narrative_indexer')
-
+        topic = self.config.get('kafka-topic', 'wsevents')
+        server = self.config.get('kafka-server', 'kafka')
+        cgroup = self.config.get('kafka-clientgroup', 'narrative_indexer')
 
         c = Consumer({
             'bootstrap.servers': server,
@@ -42,7 +41,7 @@ class NarrativeIndexer:
         c.subscribe([topic])
 
         while True:
-            msg = c.poll(0.1)
+            msg = c.poll(0.5)
 
             if msg is None:
                 continue
@@ -50,7 +49,7 @@ class NarrativeIndexer:
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
                 else:
-                    print("Kafka error: "+msg.error())
+                    print("Kafka error: " + msg.error())
                     continue
 
             try:
@@ -59,30 +58,42 @@ class NarrativeIndexer:
             except BaseException as e:
                 print(str(e))
                 continue
-
-	c.close()
+        c.close()
 
     def process_event(self, event):
         if event['strcde'] != 'WS':
             print("Unreconginized strcde")
             return
+        # Sample record...
+        # { "strcde" : "WS",
+        #   "accgrp" : 10459,
+        #   "objid" : "1",
+        #   "ver" : 227,
+        #   "newname" : null,
+        #   "time" : "2018-02-08T23:23:25.553Z",
+        #   "evtype" : "NEW_VERSION",
+        #   "objtype" : "KBaseNarrative.Narrative",
+        #   "objtypever" : 4,
+        #   "public" : false}
 
-        if event['evtype'] == 'NEW_VERSION':
-            upa = '%s/%s/%s' % (event['accgrp'], event['objid'], event['ver'])
-            res = self.iu.index_object(upa)
-            print(res)
-        elif event['evtype'] == 'NEW_ALL_VERSIONS':
-            return
-        elif event['evtype'] == 'RENAME_ALL_VERSIONS':
-            return
-        elif event['evtype'] == 'DELETE_ALL_VERSIONS':
-            return
+        etype = event['evtype']
+        upa = '%s/%s/%s' % (event['accgrp'], event['objid'], event['ver'])
+        if etype == 'NEW_VERSION':
+            self.iu.index_request(upa)
+        elif etype in ['NEW_ALL_VERSIONS', 'RENAME_ALL_VERSIONS', 'UNDELETE_ALL_VERSIONS']:
+            self.iu.index_request('%s' % event['accgrp'])
+        elif etype in ['REINDEX_WORKSPACE']:
+            self.iu.reindex_request(event['accgrp'])
+        elif etype.find('DELETE_') >= 0:
+            self.iu.delete_object(upa)
+        elif etype.find('PUBLISH_ALL_VERSIONS') >= 0:
+            # Change in publish state
+            self.iu.update_access(event['accgrp'])
+        elif etype.find('_ACCESS_GROUP') > 0:
+            # Change in publish state
+            print("Warning ACCESS GROUP not handled")
         else:
-            print("Can't process evtype " + event['evtype']) 
-
-
-#{ "strcde" : "WS", "accgrp" : 10459, "objid" : "1", "ver" : 227, "newname" : null, "time" : "2018-02-08T23:23:25.553Z", "evtype" : "NEW_VERSION", "objtype" : "KBaseNarrative.Narrative", "objtypever" : 4, "public" : false}
-
+            print("Can't process evtype " + event['evtype'])
 
     #END_CLASS_HEADER
 
@@ -90,8 +101,8 @@ class NarrativeIndexer:
     # be found
     def __init__(self, config):
         #BEGIN_CONSTRUCTOR
-        self.config=config
-        #raise ValueError("break")
+        self.config = config
+        # raise ValueError("break")
         self.iu = IndexerUtils(config)
         self.kafka_thread = Thread(target=self.kafka_watcher)
         self.kafka_thread.daemon = True
