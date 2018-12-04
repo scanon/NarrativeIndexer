@@ -19,7 +19,6 @@ compile:
 	kb-sdk compile $(SPEC_FILE) \
 		--out $(LIB_DIR) \
 		--pyclname $(SERVICE_CAPS).$(SERVICE_CAPS)Client \
-		--pysrvname $(SERVICE_CAPS).$(SERVICE_CAPS)Server \
 		--pyimplname $(SERVICE_CAPS).$(SERVICE_CAPS)Impl;
 
 build:

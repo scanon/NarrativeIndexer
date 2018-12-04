@@ -1,9 +1,7 @@
 # Special Indexer for Narrative Objects
 
-
 def narrative_indexer(ws, upa):
     obj = ws.get_objects2({'objects': [{'ref': upa}]})['data'][0]
-    print(obj.keys())
     metadata = obj['info'][10]
     rec = dict()
     rec['title'] = metadata['name']
@@ -12,7 +10,7 @@ def narrative_indexer(ws, upa):
     job_ids = []
     for cell in obj['data']['cells']:
         ctype = cell['cell_type']
-        if ctype == 'markdown':
+        if ctype == 'markdown' and cell['source'] != "":
             source.append(cell['source'])
         elif ctype == 'code' and 'kbase' in cell['metadata']:
             kbm = cell['metadata']['kbase']
@@ -23,4 +21,5 @@ def narrative_indexer(ws, upa):
                 continue
     rec['app_info'] = app_info
     rec['jobs'] = job_ids
+    rec['markdown'] = source
     return rec

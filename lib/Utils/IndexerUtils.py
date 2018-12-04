@@ -4,6 +4,7 @@ from Indexers.GenomeObjectIndexer import genome_indexer
 from elasticsearch import Elasticsearch
 
 from time import time
+import json
 
 # This is the interface that will handle the event
 
@@ -47,6 +48,7 @@ class IndexerUtils:
             "accgrp": wsid,
             "creator": info[2],
             "wsname": info[1],
+            "oname": info[1],
             "nobjects": info[4],
             "guid": "WS:%s/%s/%s" % (wsid, self.fakeid, self.fakever),
             "islast": True,
@@ -56,15 +58,19 @@ class IndexerUtils:
             "stags": [],
             "str_cde": "WS",
             "timestamp": int(time()),
+            "otype": "Workspace",
+            "otypever": 1,
+            "ojson": "{}",
+            "pjson": "{}",
             "version": 1
         }
 
-        rec['title'] = meta.get('narrative_nice_name', 'No Name')
+        rec['key.title'] = [meta.get('narrative_nice_name', 'No Name')]
         if 'narrative' in meta:
             upa = '%d/%s' % (wsid, meta['narrative'])
-            rec['narrative'] = self.index_object(upa, 'KBaseNarrative.Narrative')
+            rec['key.narrative'] = [self.index_object(upa, 'KBaseNarrative.Narrative')]
         # { u'narrative': u'23', , u'data_palette_id': u'22'}
-        rec['objects'] = dict()
+        rec['key.objects'] = []
         for obj in self.ws.list_objects({'ids': [wsid]}):
             upa = '%s/%s/%s' % (obj[6], obj[0], obj[4])
             otype = obj[2].split('-')[0]
@@ -75,7 +81,9 @@ class IndexerUtils:
                 oindex.update(self._create_obj_rec(obj))
             else:
                 oindex = self._create_obj_rec(obj)
-            rec['objects'][obj[0]] = oindex
+            rec['key.objects'].append(oindex)
+        ojson_data = {'title': rec['key.title']}
+        rec['ojson'] = str(json.dumps(ojson_data))
         return rec
 
     def _create_obj_rec(self, obj):

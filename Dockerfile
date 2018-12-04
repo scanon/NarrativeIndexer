@@ -16,7 +16,10 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.5.11-Linux-x86
     echo "conda activate base" >> ~/.bashrc
 
 ENV PATH=/opt/conda/bin:$PATH
+RUN conda install nose coverage
 RUN pip install confluent-kafka elasticsearch
+
+RUN pip install uwsgi jsonrpcbase
 
 # -----------------------------------------
 
@@ -31,3 +34,4 @@ RUN make all
 ENTRYPOINT [ "./scripts/entrypoint.sh" ]
 
 CMD [ ]
+
